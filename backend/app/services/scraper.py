@@ -1,6 +1,6 @@
 """
 Playwright 爬虫服务
-自动抓取抖音评论
+自动抓取小红书/抖音评论
 """
 
 from playwright.async_api import async_playwright
@@ -11,6 +11,105 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+class XiaohongshuScraper:
+    """小红书评论爬虫"""
+    
+    def __init__(self):
+        self.base_url = "https://www.xiaohongshu.com"
+        self.cookie_str = os.getenv("XIAOHONGSHU_COOKIE", "")
+        
+    def parse_cookies(self, cookie_str: str) -> List[Dict]:
+        """解析 Cookie 字符串为 Playwright 格式"""
+        cookies = []
+        for item in cookie_str.split("; "):
+            if "=" in item:
+                name, value = item.split("=", 1)
+                cookies.append({
+                    "name": name,
+                    "value": value,
+                    "domain": ".xiaohongshu.com",
+                    "path": "/"
+                })
+        return cookies
+    
+    async def get_note_comments(self, note_id: str, cookie: Optional[str] = None) -> List[Dict]:
+        """
+        抓取小红书笔记评论
+        
+        Args:
+            note_id: 笔记 ID (如 63f5d9e90000000014005f3a)
+            cookie: 登录 cookie (可选，默认使用 .env 中的)
+            
+        Returns:
+            评论列表
+        """
+        comments = []
+        cookie_to_use = cookie or self.cookie_str
+        
+        if not cookie_to_use:
+            print("⚠️ 警告：未配置小红书 Cookie，无法抓取真实数据")
+            return []
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+            
+            # 设置 Cookie
+            cookies = self.parse_cookies(cookie_to_use)
+            await context.add_cookies(cookies)
+            
+            page = await context.new_page()
+            
+            try:
+                # 访问笔记页面
+                note_url = f"{self.base_url}/discovery/item/{note_id}"
+                print(f"📕 正在抓取：{note_url}")
+                await page.goto(note_url, wait_until="networkidle", timeout=30000)
+                
+                # 等待评论加载
+                try:
+                    await page.wait_for_selector(".comment-item", timeout=10000)
+                except Exception:
+                    print("⚠️ 未找到评论区域，可能笔记不存在或需要登录")
+                    return []
+                
+                # 获取所有评论
+                comment_elements = await page.query_selector_all(".comment-item")
+                print(f"✅ 找到 {len(comment_elements)} 条评论")
+                
+                for elem in comment_elements:
+                    try:
+                        content = await elem.inner_text()
+                        author_elem = await elem.query_selector(".username")
+                        author_name = await author_elem.inner_text() if author_elem else "小红书用户"
+                        
+                        like_elem = await elem.query_selector(".like-count")
+                        like_count = int(await like_elem.inner_text()) if like_elem else 0
+                        
+                        comments.append({
+                            "platform": "xiaohongshu",
+                            "content": content,
+                            "author": author_name,
+                            "like_count": like_count,
+                            "intent_score": None,
+                            "intent_level": None,
+                            "reply_status": "pending",
+                            "created_at": datetime.now().isoformat()
+                        })
+                    except Exception as e:
+                        print(f"解析评论失败：{e}")
+                        continue
+                        
+            except Exception as e:
+                print(f"❌ 抓取小红书评论失败：{e}")
+            finally:
+                await browser.close()
+        
+        return comments
 
 
 class DouyinScraper:
@@ -116,17 +215,20 @@ class CommentScraperService:
     """评论爬虫服务（统一管理）"""
     
     def __init__(self):
+        self.xiaohongshu = XiaohongshuScraper()
         self.douyin = DouyinScraper()
     
     async def scrape_comments(
         self,
         platform: str,
-        video_id: str,
+        content_id: str,
         cookie: Optional[str] = None
     ) -> List[Dict]:
         """统一爬虫接口"""
-        if platform == "douyin":
-            return await self.douyin.get_video_comments(video_id, cookie)
+        if platform == "xiaohongshu":
+            return await self.xiaohongshu.get_note_comments(content_id, cookie)
+        elif platform == "douyin":
+            return await self.douyin.get_video_comments(content_id, cookie)
         else:
             raise ValueError(f"不支持的平台：{platform}")
 

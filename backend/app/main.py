@@ -259,28 +259,45 @@ async def generate_report(background_tasks: BackgroundTasks):
     }
 
 @app.get("/api/test-scrape")
-async def test_scrape(video_id: str = "7350123456789012345"):
-    """测试抓取抖音评论（真实数据）"""
+async def test_scrape(platform: str = "douyin", content_id: str = ""):
+    """测试抓取评论（真实数据）
+    
+    Args:
+        platform: 平台 (douyin/xiaohongshu)
+        content_id: 内容 ID (视频 ID 或笔记 ID)
+    """
     try:
         from app.services.scraper import CommentScraperService
         scraper = CommentScraperService()
         
+        # 默认测试 ID
+        if not content_id:
+            if platform == "douyin":
+                content_id = "7350123456789012345"
+            elif platform == "xiaohongshu":
+                content_id = "63f5d9e90000000014005f3a"
+        
         comments = await scraper.scrape_comments(
-            platform="douyin",
-            video_id=video_id
+            platform=platform,
+            content_id=content_id
         )
         
         return {
             "success": True,
-            "video_id": video_id,
+            "platform": platform,
+            "content_id": content_id,
             "comment_count": len(comments),
-            "comments": comments[:20]  # 返回前 20 条
+            "comments": comments[:20]
         }
     except Exception as e:
         return {
             "success": False,
             "error": str(e)
         }
+
+
+@app.get("/api/platforms")
+def get_platforms():
     """获取已连接的平台列表"""
     return {
         "platforms": [
