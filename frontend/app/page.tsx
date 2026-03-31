@@ -31,10 +31,10 @@ const MOCK_COMMENTS: Comment[] = [
 
 export default function Dashboard() {
   const [todayStats, setTodayStats] = useState({
-    totalComments: 0,
-    highIntent: 0,
-    repliesSent: 0,
-    privateMessages: 0
+    total_comments: 0,
+    high_intent: 0,
+    replies_sent: 0,
+    private_messages: 0
   })
 
   const [comments, setComments] = useState<Comment[]>([])
@@ -56,10 +56,10 @@ export default function Dashboard() {
         } else {
           // API 失败时使用 mock 数据
           setTodayStats({
-            totalComments: 156,
-            highIntent: 23,
-            repliesSent: 18,
-            privateMessages: 45
+            total_comments: 156,
+            high_intent: 23,
+            replies_sent: 18,
+            private_messages: 45
           })
         }
         
@@ -73,10 +73,10 @@ export default function Dashboard() {
         console.error('加载数据失败:', error)
         // 使用 mock 数据
         setTodayStats({
-          totalComments: 156,
-          highIntent: 23,
-          repliesSent: 18,
-          privateMessages: 45
+          total_comments: 156,
+          high_intent: 23,
+          replies_sent: 18,
+          private_messages: 45
         })
         setComments(MOCK_COMMENTS)
       } finally {
@@ -132,7 +132,7 @@ export default function Dashboard() {
               <MessageSquare className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-white">{todayStats.totalComments}</div>
+              <div className="text-3xl font-bold text-white">{todayStats.total_comments}</div>
               <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
                 较昨日 +12%
@@ -146,8 +146,8 @@ export default function Dashboard() {
               <Heart className="w-4 h-4 text-pink-400 group-hover:scale-110 transition-transform" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-white">{todayStats.highIntent}</div>
-              <p className="text-xs text-gray-400 mt-1">已自动回复 {todayStats.repliesSent} 条</p>
+              <div className="text-3xl font-bold text-white">{todayStats.high_intent}</div>
+              <p className="text-xs text-gray-400 mt-1">已自动回复 {todayStats.replies_sent} 条</p>
             </CardContent>
           </Card>
 
@@ -157,7 +157,7 @@ export default function Dashboard() {
               <Users className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-white">{todayStats.privateMessages}</div>
+              <div className="text-3xl font-bold text-white">{todayStats.private_messages}</div>
               <p className="text-xs text-gray-400 mt-1">待跟进 8 条</p>
             </CardContent>
           </Card>
@@ -169,6 +169,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-white">{todayStats.total_comments > 0 ? ((todayStats.high_intent / todayStats.total_comments * 100).toFixed(2) + '%') : '0%'}</div>
+              <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" />
+                较昨日 +2.3%
+              </p>
               <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
                 较昨日 +2.3%
