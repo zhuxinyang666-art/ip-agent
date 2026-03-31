@@ -10,6 +10,10 @@ from typing import List, Optional, Dict
 from datetime import datetime, date
 import httpx
 import os
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 app = FastAPI(
     title="IP Agent API",
