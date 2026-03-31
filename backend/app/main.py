@@ -3,10 +3,10 @@ IP Agent Backend API
 小红书 + 抖音 IP 运营自动化平台
 """
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, date
 import httpx
 import os
@@ -173,54 +173,6 @@ def get_comments(platform: Optional[str] = None, intent_level: Optional[str] = N
     
     return comments
 
-@app.post("/api/analyze-intent", response_model=AutoReplyResponse)
-async def analyze_intent(comment: AutoReplyRequest):
-    """AI 分析评论意向度"""
-    try:
-        # 调用中转 API 分析意向度
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{MIDTRANS_API_URL}/messages",
-                headers={
-                    "Authorization": f"Bearer {MIDTRANS_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "claude-sonnet-4-20250514",
-                    "max_tokens": 500,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "你是一个电商评论分析专家。分析用户评论的购买意向度，返回 JSON 格式：{\"score\": 0-100, \"level\": \"high|medium|low|sold\", \"reply\": \"建议回复内容\"}"
-                        },
-                        {
-                            "role": "user",
-                            "content": f"评论来自{comment.platform}平台，内容是：{comment.content}"
-                        }
-                    ]
-                },
-                timeout=30.0
-            )
-            
-            # 模拟响应（实际应该解析 API 响应）
-            intent_score = 85
-            intent_level = "high"
-            reply = f"感谢关注！我们产品质量很好，现在有优惠活动哦~ 点击主页了解更多！"
-            
-    except Exception as e:
-        # API 调用失败时使用本地分析
-        intent_score = len(comment.content) * 10  # 简单规则
-        intent_score = min(100, max(0, intent_score))
-        intent_level = "high" if intent_score >= 80 else "medium" if intent_score >= 50 else "low"
-        reply = "感谢关注！欢迎私信了解更多详情~"
-    
-    return AutoReplyResponse(
-        success=True,
-        reply=reply,
-        intent_score=intent_score,
-        intent_level=intent_level
-    )
-
 @app.post("/api/auto-reply")
 async def auto_reply(request: AutoReplyRequest, background_tasks: BackgroundTasks):
     """自动回复评论"""
@@ -257,6 +209,35 @@ async def generate_report(background_tasks: BackgroundTasks):
         "success": True,
         "message": "日报已生成并发送"
     }
+
+@app.post("/api/analyze-intent")
+async def analyze_intent(request: Request):
+    """AI 分析评论意向度"""
+    try:
+        data = await request.json()
+        comments = data.get("comments", [])
+        
+        from app.services.analyzer import IntentAnalyzer
+        analyzer = IntentAnalyzer()
+        
+        results = await analyzer.analyze_batch(comments)
+        
+        return {
+            "success": True,
+            "results": results,
+            "summary": {
+                "total": len(results),
+                "high_intent": len([r for r in results if r.get("intent_level") == "high"]),
+                "medium_intent": len([r for r in results if r.get("intent_level") == "medium"]),
+                "low_intent": len([r for r in results if r.get("intent_level") == "low"])
+            }
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 
 @app.get("/api/test-scrape")
 async def test_scrape(platform: str = "douyin", content_id: str = ""):
