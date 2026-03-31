@@ -252,6 +252,53 @@ def get_daily_report(report_date: str = datetime.now().strftime("%Y-%m-%d")):
         summary=f"今日共处理 {len(MOCK_COMMENTS)} 条评论，其中高意向 {high_intent} 条，已自动回复 {replies_sent} 条。转化率表现良好！"
     )
 
+@app.post("/api/report/send-feishu")
+async def send_report_feishu(request: Request):
+    """发送日报到飞书"""
+    try:
+        data = await request.json()
+        
+        from app.services.feishu_reporter import FeishuReporter
+        reporter = FeishuReporter()
+        
+        # 获取日报数据
+        report_date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
+        
+        # 从 mock 数据获取统计（MOCK_COMMENTS 是 Pydantic 模型列表）
+        high_intent = len([c for c in MOCK_COMMENTS if getattr(c, 'intent_level', '') in ["high", "sold"]])
+        medium_intent = len([c for c in MOCK_COMMENTS if getattr(c, 'intent_level', '') == "medium"])
+        low_intent = len([c for c in MOCK_COMMENTS if getattr(c, 'intent_level', '') == "low"])
+        replies_sent = len([c for c in MOCK_COMMENTS if getattr(c, 'reply_status', '') == "replied"])
+        total = len(MOCK_COMMENTS)
+        conversion_rate = round(high_intent / total * 100, 2) if total > 0 else 0
+        
+        # 获取 Top 评论（转换为 dict）
+        top_comments = sorted(
+            [c.dict() for c in MOCK_COMMENTS if getattr(c, 'intent_level', '') == "high"],
+            key=lambda x: x.get('like_count', 0),
+            reverse=True
+        )[:5]
+        
+        result = await reporter.send_report(
+            date=report_date,
+            total_comments=total,
+            high_intent=high_intent,
+            medium_intent=medium_intent,
+            low_intent=low_intent,
+            replies_sent=replies_sent,
+            conversion_rate=conversion_rate,
+            top_comments=top_comments
+        )
+        
+        return result
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 @app.post("/api/generate-report")
 async def generate_report(background_tasks: BackgroundTasks):
     """生成并发送日报"""
