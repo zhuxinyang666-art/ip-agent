@@ -185,6 +185,57 @@ async def auto_reply(request: AutoReplyRequest, background_tasks: BackgroundTask
         "comment_id": request.comment_id
     }
 
+@app.post("/api/auto-reply/generate")
+async def generate_auto_reply(request: Request):
+    """AI 生成自动回复内容"""
+    try:
+        data = await request.json()
+        comments = data.get("comments", [])
+        
+        from app.services.reply_generator import ReplyGenerator
+        generator = ReplyGenerator()
+        
+        results = await generator.generate_batch(comments)
+        
+        return {
+            "success": True,
+            "results": results,
+            "count": len(results)
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.post("/api/auto-reply/send")
+async def send_auto_reply(request: Request):
+    """发送自动回复到平台"""
+    try:
+        data = await request.json()
+        comment_id = data.get("comment_id")
+        reply_content = data.get("reply_content")
+        platform = data.get("platform")
+        
+        # TODO: 实际调用平台 API 发送回复
+        # 目前仅做模拟
+        
+        print(f"📤 发送回复到 {platform}: {reply_content}")
+        
+        return {
+            "success": True,
+            "message": "回复已发送",
+            "comment_id": comment_id,
+            "reply_content": reply_content
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 @app.get("/api/daily-report", response_model=DailyReport)
 def get_daily_report(report_date: str = datetime.now().strftime("%Y-%m-%d")):
     """获取日报数据"""
